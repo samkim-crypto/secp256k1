@@ -13,8 +13,8 @@
 //! The native secp256k1 program performs flexible verification of secp256k1
 //! ECDSA signatures, as used by Ethereum. The shared API re-exported by this
 //! crate mirrors that native instruction format so clients can build compatible
-//! instructions, while this crate's processor lets other programs CPI into a
-//! verifier and trust the result.
+//! instructions, while this crate's processor verifies transaction-level
+//! instructions and rejects cross-program invocations.
 //!
 //! The instruction is primarily designed for Ethereum interoperability, but it
 //! is also useful for more general secp256k1 verification. It operates on
@@ -55,9 +55,9 @@
 //!
 //! 1. A client constructs secp256k1-compatible instruction data containing the
 //!    signature metadata and any inline payload bytes.
-//! 2. A program either invokes this verifier by cross-program invocation or inspects the transaction's
-//!    native secp256k1 instruction and checks that the verified messages and
-//!    addresses match its own expectations.
+//! 2. The transaction includes this verifier as a top-level instruction, or a
+//!    program inspects the transaction's native secp256k1 instruction and checks
+//!    that the verified messages and addresses match its own expectations.
 //!
 //! In client code, the usual flow is:
 //!
@@ -79,7 +79,8 @@
 //! all offset references must point to the current instruction (index `0`). An
 //! SBF program receives only its own instruction data, so supporting sibling
 //! instruction references would require runtime support that Solana programs do
-//! not currently have.
+//! not currently have. The processor also rejects CPI by checking
+//! `sol_get_stack_height()` before verifying instruction data.
 //!
 //! # Instruction data layout
 //!
@@ -171,9 +172,21 @@ pub use instruction::{
 pub use processor::process_instruction;
 
 #[cfg(target_os = "solana")]
+use solana_program_entrypoint::ProgramResult;
+#[cfg(target_os = "solana")]
 use solana_program_error::ProgramError;
 
 /// Program entry point for the version 2 instruction-data pointer interface.
+#[cfg(all(target_os = "solana", not(feature = "no-entrypoint")))]
+#[unsafe(no_mangle)]
+pub extern "C" fn entrypoint(input: *mut u8, instruction_data_addr: *const u8) -> u64 {
+    match unsafe { process_entrypoint(input, instruction_data_addr) } {
+        Ok(()) => solana_program_entrypoint::SUCCESS,
+        Err(error) => error.into(),
+    }
+}
+
+/// Processes the version 2 instruction-data pointer interface.
 ///
 /// # Safety
 ///
@@ -181,29 +194,25 @@ use solana_program_error::ProgramError;
 /// `instruction_data_addr` as the pointer to instruction data with its length
 /// stored in the preceding 8 bytes.
 #[cfg(all(target_os = "solana", not(feature = "no-entrypoint")))]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn entrypoint(input: *mut u8, instruction_data_addr: *const u8) -> u64 {
-    let result = unsafe {
-        let num_accounts = *(input as *const u64);
-        if num_accounts != 0 {
-            Err(ProgramError::InvalidArgument)
-        } else {
-            let Some(instruction_data_len_addr) =
-                (instruction_data_addr as usize).checked_sub(core::mem::size_of::<u64>())
-            else {
-                return ProgramError::InvalidInstructionData.into();
-            };
-            let instruction_data_len = *(instruction_data_len_addr as *const u64);
-            let instruction_data =
-                core::slice::from_raw_parts(instruction_data_addr, instruction_data_len as usize);
-            processor::verify_secp256k1_instruction(instruction_data)
-        }
+unsafe fn process_entrypoint(input: *mut u8, instruction_data_addr: *const u8) -> ProgramResult {
+    if processor::in_cpi() {
+        return Err(ProgramError::InvalidArgument);
+    }
+
+    let num_accounts = unsafe { *(input as *const u64) };
+    if num_accounts != 0 {
+        return Err(ProgramError::InvalidArgument);
+    }
+
+    let instruction_data_len_addr = (instruction_data_addr as usize)
+        .checked_sub(core::mem::size_of::<u64>())
+        .ok_or(ProgramError::InvalidInstructionData)?;
+    let instruction_data_len = unsafe { *(instruction_data_len_addr as *const u64) };
+    let instruction_data = unsafe {
+        core::slice::from_raw_parts(instruction_data_addr, instruction_data_len as usize)
     };
 
-    match result {
-        Ok(()) => solana_program_entrypoint::SUCCESS,
-        Err(error) => error.into(),
-    }
+    processor::verify_secp256k1_instruction(instruction_data)
 }
 
 #[cfg(not(feature = "no-entrypoint"))]

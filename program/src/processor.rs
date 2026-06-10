@@ -19,6 +19,21 @@ use {
 /// in `SecpSignatureOffsets` must reference index 0. Supporting other indices
 /// would require a runtime change to expose sibling instruction data.
 const CURRENT_INSTRUCTION_INDEX: u8 = 0;
+
+pub(crate) fn in_cpi() -> bool {
+    #[cfg(target_os = "solana")]
+    {
+        use solana_instruction::{syscalls::sol_get_stack_height, TRANSACTION_LEVEL_STACK_HEIGHT};
+
+        unsafe { sol_get_stack_height() as usize > TRANSACTION_LEVEL_STACK_HEIGHT }
+    }
+
+    #[cfg(not(target_os = "solana"))]
+    {
+        false
+    }
+}
+
 const SIGNATURE_SCALAR_LENGTH: usize = 32;
 const SECP256K1_ORDER: [u8; SIGNATURE_SCALAR_LENGTH] = [
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
@@ -42,13 +57,18 @@ pub(crate) fn verify_secp256k1_instruction(instruction_data: &[u8]) -> ProgramRe
 /// Program entry point.
 ///
 /// Expects no accounts and instruction data in the secp256k1 precompile
-/// format. Returns [`ProgramError::InvalidArgument`] if any accounts are
-/// provided, or propagates errors from signature verification.
+/// format. Returns [`ProgramError::InvalidArgument`] if invoked through CPI or
+/// if any accounts are provided, or propagates errors from signature
+/// verification.
 pub fn process_instruction(
     _program_id: &Pubkey,
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
+    if in_cpi() {
+        return Err(ProgramError::InvalidArgument);
+    }
+
     if !accounts.is_empty() {
         return Err(ProgramError::InvalidArgument);
     }
@@ -133,5 +153,15 @@ fn subtract_s_from_order(s: &mut [u8]) {
             *byte = (minuend + 256 - subtrahend) as u8;
             borrow = 1;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn host_is_not_in_cpi() {
+        assert!(!in_cpi());
     }
 }
