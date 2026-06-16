@@ -128,10 +128,10 @@ fn read_array_from_payload<const N: usize>(
 ///
 /// On-chain (SBF), this uses ABIv2 memory mappings to read sibling instructions.
 /// Off-chain (native/tests), this requires the target index to be 0 (the current instruction).
-pub(crate) fn fetch_instruction_payload<'a>(
+pub(crate) fn fetch_instruction_payload(
     index: u8,
-    _current_instruction_data: &'a [u8],
-) -> Result<&'a [u8], ProgramError> {
+    _current_instruction_data: &[u8],
+) -> Result<&[u8], ProgramError> {
     #[cfg(any(target_os = "solana", target_arch = "bpf"))]
     {
         use solana_transaction_context::{

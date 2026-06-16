@@ -172,6 +172,7 @@ pub use instruction::{
 pub use processor::process_instruction;
 
 /// Program entrypoint for the version 2 instruction-data pointer interface.
+#[allow(clippy::missing_safety_doc)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn entrypoint() -> u64 {
     use solana_transaction_context::{

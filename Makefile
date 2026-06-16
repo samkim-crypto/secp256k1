@@ -1,6 +1,6 @@
 RUST_TOOLCHAIN_NIGHTLY = nightly-2026-01-22
 SOLANA_CLI_VERSION = v3.1.10
-SBF_ARCH = v2
+SBF_ARCH = v3
 
 nightly = +${RUST_TOOLCHAIN_NIGHTLY}
 
@@ -44,7 +44,7 @@ build-doc-%:
 		$(ARGS)
 
 build-sbf-%:
-	cargo build-sbf --arch $(SBF_ARCH) --manifest-path $(call make-path,$*)/Cargo.toml -- --locked $(ARGS)
+	cargo build-sbf --arch $(SBF_ARCH) --abi-v2 --manifest-path $(call make-path,$*)/Cargo.toml -- --locked $(ARGS)
 
 test-%:
 	@if [ -f target/deploy/$(call make-so,$*).so ]; then \
