@@ -100,8 +100,8 @@ fn signature_offsets_from_bytes(input: &[u8]) -> Result<SignatureOffsets<'_>, Pr
 ///
 /// `offset` is a `u16` to match the field widths in `SecpSignatureOffsets`;
 /// the arithmetic is promoted to `usize` with overflow protection.
-fn get_instruction_data_slice(
-    input: &[u8],
+fn read_slice_from_payload(
+    payload: &[u8],
     offset: u16,
     length: usize,
 ) -> Result<&[u8], ProgramError> {
@@ -109,18 +109,69 @@ fn get_instruction_data_slice(
     let end = offset
         .checked_add(length)
         .ok_or(ProgramError::InvalidInstructionData)?;
-    input
+    payload
         .get(offset..end)
         .ok_or(ProgramError::InvalidInstructionData)
 }
 
-fn get_instruction_data_array<const N: usize>(
-    input: &[u8],
+/// Reads a fixed-size array from the provided instruction payload.
+fn read_array_from_payload<const N: usize>(
+    payload: &[u8],
     offset: u16,
 ) -> Result<&[u8; N], ProgramError> {
-    get_instruction_data_slice(input, offset, N)?
+    read_slice_from_payload(payload, offset, N)?
         .try_into()
         .map_err(|_| ProgramError::InvalidInstructionData)
+}
+
+/// Fetches the raw instruction data payload for a given instruction index.
+///
+/// On-chain (SBF), this uses ABIv2 memory mappings to read sibling instructions.
+/// Off-chain (native/tests), this requires the target index to be 0 (the current instruction).
+pub(crate) fn fetch_instruction_payload<'a>(
+    index: u8,
+    _current_instruction_data: &'a [u8],
+) -> Result<&'a [u8], ProgramError> {
+    #[cfg(any(target_os = "solana", target_arch = "bpf"))]
+    {
+        use solana_transaction_context::{
+            instruction::InstructionFrame,
+            transaction::TransactionFrame,
+            vm_addresses::{INSTRUCTION_TRACE_AREA, TRANSACTION_FRAME_ADDRESS},
+        };
+
+        // Grab the transaction frame
+        let tx_frame = unsafe { &*(TRANSACTION_FRAME_ADDRESS as *const TransactionFrame) };
+
+        // Map the instruction trace
+        let instruction_trace = unsafe {
+            core::slice::from_raw_parts(
+                INSTRUCTION_TRACE_AREA as *const InstructionFrame,
+                tx_frame.total_number_of_instructions_in_trace as usize,
+            )
+        };
+
+        // Grab the target instruction's data
+        let frame = instruction_trace
+            .get(index as usize)
+            .ok_or(ProgramError::InvalidInstructionData)?;
+
+        let ptr = frame.instruction_data.ptr() as *const u8;
+        let len = frame.instruction_data.len() as usize;
+
+        Ok(unsafe { core::slice::from_raw_parts(ptr, len) })
+    }
+
+    #[cfg(not(any(target_os = "solana", target_arch = "bpf")))]
+    {
+        // For native testing, ABIv2 memory maps are unavailable.
+        // Tests currently only simulate the `secp256k1` instruction at index 0.
+        if index == 0 {
+            Ok(_current_instruction_data)
+        } else {
+            Err(ProgramError::InvalidInstructionData)
+        }
+    }
 }
 
 /// Extracts all signature fields for one entry from raw
@@ -132,23 +183,27 @@ pub(crate) fn get_signature_fields<'a>(
     instruction_data: &'a [u8],
     offsets: &SignatureOffsets<'_>,
 ) -> Result<SignatureFields<'a>, ProgramError> {
+    let sig_data =
+        fetch_instruction_payload(offsets.signature_instruction_index(), instruction_data)?;
+    let eth_data =
+        fetch_instruction_payload(offsets.eth_address_instruction_index(), instruction_data)?;
+    let msg_data =
+        fetch_instruction_payload(offsets.message_instruction_index(), instruction_data)?;
+
     let recovery_id_offset = usize::from(offsets.signature_offset())
         .checked_add(SIGNATURE_SERIALIZED_SIZE)
         .ok_or(ProgramError::InvalidInstructionData)?;
-    let recovery_id = instruction_data
+    let recovery_id = sig_data
         .get(recovery_id_offset)
         .copied()
         .ok_or(ProgramError::InvalidInstructionData)?;
 
     Ok(SignatureFields {
-        signature: get_instruction_data_array(instruction_data, offsets.signature_offset())?,
+        signature: read_array_from_payload(instruction_data, offsets.signature_offset())?,
         recovery_id: validate_recovery_id(recovery_id)?,
-        expected_address: get_instruction_data_array(
-            instruction_data,
-            offsets.eth_address_offset(),
-        )?,
-        message: get_instruction_data_slice(
-            instruction_data,
+        expected_address: read_array_from_payload(eth_data, offsets.eth_address_offset())?,
+        message: read_slice_from_payload(
+            msg_data,
             offsets.message_data_offset(),
             usize::from(offsets.message_data_size()),
         )?,

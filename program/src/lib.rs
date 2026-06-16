@@ -171,67 +171,38 @@ pub use instruction::{
 };
 pub use processor::process_instruction;
 
-#[cfg(target_os = "solana")]
-use solana_program_entrypoint::ProgramResult;
-#[cfg(target_os = "solana")]
-use solana_program_error::ProgramError;
-
-/// Program entry point for the version 2 instruction-data pointer interface.
-#[cfg(all(target_os = "solana", not(feature = "no-entrypoint")))]
+/// Program entrypoint for the version 2 instruction-data pointer interface.
 #[unsafe(no_mangle)]
-pub extern "C" fn entrypoint(input: *mut u8, instruction_data_addr: *const u8) -> u64 {
-    match unsafe { process_entrypoint(input, instruction_data_addr) } {
-        Ok(()) => solana_program_entrypoint::SUCCESS,
-        Err(error) => error.into(),
-    }
-}
-
-/// Processes the version 2 instruction-data pointer interface.
-///
-/// # Safety
-///
-/// The Solana runtime must pass `input` as the serialized accounts buffer and
-/// `instruction_data_addr` as the pointer to instruction data with its length
-/// stored in the preceding 8 bytes.
-#[cfg(all(target_os = "solana", not(feature = "no-entrypoint")))]
-unsafe fn process_entrypoint(input: *mut u8, instruction_data_addr: *const u8) -> ProgramResult {
-    if processor::in_cpi() {
-        return Err(ProgramError::InvalidArgument);
-    }
-
-    let num_accounts = unsafe { *(input as *const u64) };
-    if num_accounts != 0 {
-        return Err(ProgramError::InvalidArgument);
-    }
-
-    let instruction_data_len_addr = (instruction_data_addr as usize)
-        .checked_sub(core::mem::size_of::<u64>())
-        .ok_or(ProgramError::InvalidInstructionData)?;
-    let instruction_data_len = unsafe { *(instruction_data_len_addr as *const u64) };
-    let instruction_data = unsafe {
-        core::slice::from_raw_parts(instruction_data_addr, instruction_data_len as usize)
+pub unsafe extern "C" fn entrypoint() -> u64 {
+    use solana_transaction_context::{
+        instruction::InstructionFrame,
+        transaction::TransactionFrame,
+        vm_addresses::{INSTRUCTION_TRACE_AREA, TRANSACTION_FRAME_ADDRESS},
     };
 
-    processor::verify_secp256k1_instruction(instruction_data)
-}
+    // 1. Grab the Transaction Frame
+    let tx_frame = &*(TRANSACTION_FRAME_ADDRESS as *const TransactionFrame);
 
-#[cfg(not(feature = "no-entrypoint"))]
-solana_program_entrypoint::custom_heap_default!();
-#[cfg(not(feature = "no-entrypoint"))]
-solana_program_entrypoint::custom_panic_default!();
+    // 2. Map the Instruction Trace
+    let instruction_trace = core::slice::from_raw_parts(
+        INSTRUCTION_TRACE_AREA as *const InstructionFrame,
+        tx_frame.total_number_of_instructions_in_trace as usize,
+    );
 
-#[cfg(all(target_os = "solana", not(feature = "no-entrypoint")))]
-#[unsafe(no_mangle)]
-pub extern "C" fn abort() -> ! {
-    let message = "abort";
-    let file = file!();
-    unsafe {
-        solana_program_entrypoint::__log(message.as_ptr(), message.len() as u64);
-        solana_program_entrypoint::__panic(
-            file.as_ptr(),
-            file.len() as u64,
-            line!() as u64,
-            column!() as u64,
-        )
+    // 3. Grab the current Instruction Frame
+    let current_frame = &instruction_trace[tx_frame.current_executing_instruction as usize];
+
+    // 4. Extract clean data
+    let num_accounts = current_frame.instruction_accounts.len() as usize;
+    let ptr = current_frame.instruction_data.ptr() as *const u8;
+    let len = current_frame.instruction_data.len() as usize;
+    let instruction_data = core::slice::from_raw_parts(ptr, len);
+
+    // If the caller is not u16::MAX, we are inside a CPI
+    let in_cpi = current_frame.index_of_caller_instruction != u16::MAX;
+
+    match process_instruction(num_accounts, instruction_data, in_cpi) {
+        Ok(()) => solana_program_entrypoint::SUCCESS,
+        Err(error) => error.into(),
     }
 }
