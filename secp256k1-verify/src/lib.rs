@@ -1,7 +1,7 @@
 //! # Solana SECP256K1 Verify
 //!
 //! A fast, stateless, and highly configurable secp256k1 signature verification
-//! library tailored for Solana smart contracts (eBPF).
+//! library tailored for Solana smart contracts (`eBPF`).
 
 pub mod address;
 pub mod constants;

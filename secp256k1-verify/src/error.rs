@@ -9,6 +9,6 @@ pub enum Secp256k1VerifyError {
     AddressMismatch,
     /// The signature has a high 's' value and the verifier enforces low-s signatures.
     InvalidMalleableSignature,
-    /// The message provided to a strict hasher was not the correct length.
+    /// The message provided to a strict `hasher` was not the correct length.
     InvalidMessageLength,
 }

@@ -6,7 +6,7 @@ pub trait MessageHasher {
     fn hash(message: &[u8]) -> Result<[u8; 32], Secp256k1VerifyError>;
 }
 
-/// Applies the Keccak256 algorithm to the message (Standard Ethereum behavior).
+/// Applies the `Keccak256` algorithm to the message (Standard Ethereum behavior).
 #[cfg(feature = "keccak")]
 pub struct Keccak256Hasher;
 
@@ -18,7 +18,7 @@ impl MessageHasher for Keccak256Hasher {
     }
 }
 
-/// Applies the SHA256 algorithm to the message.
+/// Applies the `SHA256` algorithm to the message.
 #[cfg(feature = "sha256")]
 pub struct Sha256Hasher;
 
@@ -30,7 +30,7 @@ impl MessageHasher for Sha256Hasher {
     }
 }
 
-/// A strict pass-through hasher for messages that have already been hashed to
+/// A strict pass-through `hasher` for messages that have already been hashed to
 /// exactly 32 bytes.
 pub struct RawHasher;
 

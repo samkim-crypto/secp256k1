@@ -7,10 +7,10 @@ pub trait AddressMatcher {
     fn matches(&self, recovered_pubkey: &[u8; UNCOMPRESSED_PUBKEY_COORDS_BYTES]) -> bool;
 }
 
-/// The standard size of an EVM address (20 bytes).
+/// The standard size of an `EVM` address (20 bytes).
 pub const ETH_ADDRESS_BYTES: usize = 20;
 
-/// A standard Ethereum (EVM) 20-byte address.
+/// A standard Ethereum (`EVM`) 20-byte address.
 pub struct EvmAddress(pub [u8; ETH_ADDRESS_BYTES]);
 
 impl AddressMatcher for EvmAddress {
