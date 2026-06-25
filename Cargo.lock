@@ -1036,6 +1036,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 
 [[package]]
+name = "hex"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
 name = "hmac"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2458,6 +2464,7 @@ dependencies = [
  "solana-pubkey 4.2.0",
  "solana-sdk-ids",
  "solana-secp256k1-recover",
+ "solana-secp256k1-verify",
  "solana-signature",
  "solana-zero-copy",
 ]
@@ -2471,6 +2478,16 @@ dependencies = [
  "k256",
  "solana-define-syscall 5.1.0",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "solana-secp256k1-verify"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "solana-keccak-hasher",
+ "solana-secp256k1-recover",
+ "solana-sha256-hasher",
 ]
 
 [[package]]

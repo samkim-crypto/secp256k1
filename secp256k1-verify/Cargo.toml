@@ -1,0 +1,23 @@
+[package]
+name = "solana-secp256k1-verify"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = ["keccak"]
+keccak = ["dep:solana-keccak-hasher"]
+sha256 = ["dep:solana-sha256-hasher"]
+
+[dependencies]
+solana-secp256k1-recover = { workspace = true }
+solana-keccak-hasher = { workspace = true, optional = true }
+solana-sha256-hasher = { workspace = true, optional = true }
+
+[dev-dependencies]
+hex = { workspace = true }
+
+[lints]
+workspace = true
