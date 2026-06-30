@@ -8,7 +8,7 @@ on:
 
 env:
   SBPF_PROGRAM_PACKAGES: "['program']"
-  RUST_PACKAGES: "['program']"
+  RUST_PACKAGES: "['program', secp256k1-verify]"
 
 jobs:
   set_env:
