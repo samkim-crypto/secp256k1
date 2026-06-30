@@ -9,12 +9,15 @@ pub mod error;
 pub mod hash;
 mod verify;
 
+#[cfg(feature = "keccak")]
+use crate::{address::EvmAddress, hash::Keccak256Hasher};
+
 use {
     crate::{
-        address::{AddressMatcher, EvmAddress},
+        address::AddressMatcher,
         constants::{SIGNATURE_SERIALIZED_SIZE, UNCOMPRESSED_PUBKEY_COORDS_BYTES},
         error::Secp256k1VerifyError,
-        hash::{Keccak256Hasher, MessageHasher},
+        hash::MessageHasher,
         verify::{recover_pubkey, verify_signature},
     },
     core::marker::PhantomData,
@@ -33,6 +36,7 @@ use {
 ///
 /// This verifier defaults to strict Ethereum compliance (`enforce_low_s = true`),
 /// but exposes builder methods to handle malleability in custom ways.
+#[cfg(feature = "keccak")]
 #[derive(Debug, Clone, Copy)]
 pub struct Secp256k1Verifier<H = Keccak256Hasher, M = EvmAddress> {
     enforce_low_s: bool,
@@ -40,6 +44,15 @@ pub struct Secp256k1Verifier<H = Keccak256Hasher, M = EvmAddress> {
     _phantom: PhantomData<(H, M)>,
 }
 
+#[cfg(not(feature = "keccak"))]
+#[derive(Debug, Clone, Copy)]
+pub struct Secp256k1Verifier<H, M> {
+    enforce_low_s: bool,
+    normalize_s: bool,
+    _phantom: PhantomData<(H, M)>,
+}
+
+#[cfg(feature = "keccak")]
 impl Default for Secp256k1Verifier<Keccak256Hasher, EvmAddress> {
     fn default() -> Self {
         Self::new()
@@ -115,7 +128,7 @@ impl<H: MessageHasher, M: AddressMatcher> Secp256k1Verifier<H, M> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "keccak"))]
 mod tests {
     use super::*;
 

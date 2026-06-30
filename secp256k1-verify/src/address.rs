@@ -8,11 +8,14 @@ pub trait AddressMatcher {
 }
 
 /// The standard size of an `EVM` address (20 bytes).
+#[cfg(feature = "keccak")]
 pub const ETH_ADDRESS_BYTES: usize = 20;
 
 /// A standard Ethereum (`EVM`) 20-byte address.
+#[cfg(feature = "keccak")]
 pub struct EvmAddress(pub [u8; ETH_ADDRESS_BYTES]);
 
+#[cfg(feature = "keccak")]
 impl AddressMatcher for EvmAddress {
     #[inline(always)]
     fn matches(&self, pubkey: &[u8; UNCOMPRESSED_PUBKEY_COORDS_BYTES]) -> bool {
@@ -21,6 +24,7 @@ impl AddressMatcher for EvmAddress {
 }
 
 /// Derives a standard 20-byte Ethereum address from an uncompressed 64-byte public key.
+#[cfg(feature = "keccak")]
 pub fn eth_address_from_pubkey(
     pubkey: &[u8; UNCOMPRESSED_PUBKEY_COORDS_BYTES],
 ) -> [u8; ETH_ADDRESS_BYTES] {
@@ -39,7 +43,7 @@ impl<'a> AddressMatcher for RawPubkey<'a> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "keccak"))]
 mod tests {
     use super::*;
 
