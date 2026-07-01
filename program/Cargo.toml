@@ -23,6 +23,7 @@ solana-program-error = { workspace = true }
 solana-pubkey = { workspace = true }
 solana-sdk-ids = { workspace = true, optional = true }
 solana-secp256k1-recover = { workspace = true }
+solana-secp256k1-verify = { workspace = true }
 solana-zero-copy = { workspace = true }
 
 [target.'cfg(not(any(target_os = "solana", target_arch = "bpf")))'.dependencies]

@@ -1,5 +1,5 @@
 [workspace]
-members = ["program"]
+members = ["program", "secp256k1-verify"]
 resolver = "2"
 
 [workspace.lints.rust]
@@ -10,6 +10,7 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 
 [workspace.dependencies]
 bincode = "1.3.3"
+hex = "0.4.3"
 k256 = "0.13.4"
 mollusk-svm = "0.12.0"
 serde = { version = "1.0.228", default-features = false }
@@ -23,5 +24,7 @@ solana-program-error = "3.0.1"
 solana-pubkey = "4.1.0"
 solana-sdk-ids = "3.1.0"
 solana-secp256k1-recover = "3.1.1"
+solana-secp256k1-verify = { path = "secp256k1-verify", version = "0.1.0" }
+solana-sha256-hasher = "3.1.0"
 solana-signature = "3.4.0"
 solana-zero-copy = "1.1.1"
