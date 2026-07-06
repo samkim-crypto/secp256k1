@@ -1,3 +1,5 @@
+#![no_std]
+
 //! # Solana SECP256K1 Verify
 //!
 //! A fast, stateless, and highly configurable secp256k1 signature verification

@@ -9,31 +9,20 @@ crate-type = ["cdylib", "rlib"]
 [features]
 default = []
 no-entrypoint = []
-serde = ["dep:serde", "dep:serde_derive"]
 
 [dependencies]
-bincode = { workspace = true, optional = true }
-serde = { workspace = true, optional = true }
-serde_derive = { workspace = true, optional = true }
-solana-account-info = { workspace = true }
-solana-keccak-hasher = { workspace = true }
-solana-instruction = { workspace = true }
-solana-program-entrypoint = { workspace = true }
-solana-program-error = { workspace = true }
-solana-pubkey = { workspace = true }
-solana-sdk-ids = { workspace = true, optional = true }
-solana-secp256k1-recover = { workspace = true }
+pinocchio = { workspace = true }
 solana-secp256k1-verify = { workspace = true }
-solana-zero-copy = { workspace = true }
 
 [target.'cfg(not(any(target_os = "solana", target_arch = "bpf")))'.dependencies]
-k256 = { workspace = true }
-solana-signature = { workspace = true }
+solana-instruction = { workspace = true }
+solana-pubkey = { workspace = true }
 
 [dev-dependencies]
 mollusk-svm = { workspace = true }
-solana-address = { workspace = true }
-solana-instruction = { workspace = true }
+k256 = { workspace = true }
+sha3 = { workspace = true }
+solana-pubkey = { workspace = true }
 
 [lints]
 workspace = true
