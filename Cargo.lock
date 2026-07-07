@@ -2749,6 +2749,7 @@ name = "solana-secp256k1-verify"
 version = "0.1.0"
 dependencies = [
  "hex",
+ "solana-define-syscall 5.1.0",
  "solana-keccak-hasher",
  "solana-secp256k1-recover",
  "solana-sha256-hasher",

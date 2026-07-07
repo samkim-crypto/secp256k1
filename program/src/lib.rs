@@ -2,8 +2,8 @@
 
 use {
     pinocchio::{
-        error::ProgramError, no_allocator, nostd_panic_handler, program_entrypoint, AccountView,
-        Address, ProgramResult,
+        entrypoint::InstructionContext, error::ProgramError, lazy_program_entrypoint, no_allocator,
+        nostd_panic_handler, ProgramResult,
     },
     solana_secp256k1_verify::{address::EvmAddress, Secp256k1Verifier},
 };
@@ -12,13 +12,14 @@ use {solana_instruction::Instruction, solana_pubkey::Pubkey};
 
 no_allocator!();
 nostd_panic_handler!();
-program_entrypoint!(process_instruction);
+lazy_program_entrypoint!(process_instruction);
 
-pub fn process_instruction(
-    _program_id: &Address,
-    _accounts: &mut [AccountView],
-    instruction_data: &[u8],
-) -> ProgramResult {
+pub fn process_instruction(mut context: InstructionContext) -> ProgramResult {
+    while context.remaining() > 0 {
+        let _ = context.next_account()?;
+    }
+    let instruction_data = context.instruction_data()?;
+
     // Validate the minimum instruction data length.
     // 20 (address) + 64 (signature) + 1 (recovery_id) = 85 bytes minimum.
     if instruction_data.len() < 85 {
