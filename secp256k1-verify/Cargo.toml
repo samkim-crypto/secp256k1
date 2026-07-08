@@ -15,6 +15,7 @@ sha256 = ["dep:solana-sha256-hasher"]
 solana-secp256k1-recover = { workspace = true }
 solana-keccak-hasher = { workspace = true, optional = true }
 solana-sha256-hasher = { workspace = true, optional = true }
+solana-define-syscall = { workspace = true }
 
 [dev-dependencies]
 hex = { workspace = true }
