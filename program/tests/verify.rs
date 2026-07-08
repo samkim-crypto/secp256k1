@@ -67,4 +67,3 @@ fn test_secp256k1_verify_success() {
 
     mollusk.process_and_validate_instruction(&instruction, &[], &[Check::success()]);
 }
-
