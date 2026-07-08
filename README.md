@@ -1,137 +1,79 @@
-# solana-secp256k1-program: on-chain signature verification for Solana
+# solana-secp256k1-program
 
-A minimal Solana SBF program that verifies secp256k1 ECDSA signatures
-on-chain without adding any new runtime syscalls.
+With the deprecation of native precompiles on Solana (as outlined in SIMD-0568), support for the native `KeccakSecp256k11111111111111111111111111111` precompile is being removed.
 
-## Motivation
+To support protocols that rely on secp256k1 ECDSA signature verification, this repository provides a configurable BPF-compatible alternative. It is split into two core components:
 
-The goal is to migrate the native [secp256k1 precompile] to SBF so that it can
-be maintained and deployed like any other on-chain program. The instruction
-format is intentionally identical to the precompile, including parts that are
-not intuitive for general-purpose use, so that tools and clients built around
-the precompile require no changes.
+1. **`solana-secp256k1-verify`**: A fast, stateless, zero-allocation library for in-program verification.
+2. **`solana-secp256k1-program`**: A standalone SBF program to verify signatures on-chain.
 
-The program is intended to run only as a transaction-level instruction. It
-rejects cross-program invocations (CPI) using `sol_get_stack_height()` so that
-programs cannot treat this verifier as a CPI authorization oracle.
+## Migration Guide: Moving Away from Precompiles
 
-[secp256k1 precompile]: https://solana.com/docs/core/programs/precompiles#verify-secp256k1-recovery
+If your protocol currently relies on the secp256k1 precompile, you can migrate to use this library and program in one of the following three approaches.
 
-## Syscalls used
+### 1. In-Program Verification via Library (Recommended)
 
-Verification relies only on existing Solana runtime syscalls:
+The most efficient approach is to bundle the verification logic directly into your own program using the `solana-secp256k1-verify` crate.
 
-| Syscall | SDK wrapper |
-|---|---|
-| `sol_keccak256` | `solana_keccak_hasher::hash` |
-| `sol_secp256k1_recover` | `solana_secp256k1_recover::secp256k1_recover` |
-| `sol_get_stack_height` | `solana_define_syscall::definitions::sol_get_stack_height` |
+The library utilizes a builder pattern to configure the verifier prior to execution. By default, the verifier adheres strictly to Ethereum (EIP-2) standards by enforcing low-s signatures to prevent malleability.
 
-## Instruction format
-
-```text
-[0]                   number of signatures (u8)
-[1 .. 1 + 11*N]       N × SecpSignatureOffsets records (11 bytes each, LE)
-[1 + 11*N ..]         payload: signatures, addresses, messages (order flexible)
-```
-
-Each 11-byte offset record matches `SecpSignatureOffsets` exposed by this crate:
-
-```text
-[0..2]    signature_offset        - byte position of 64-byte r||s + 1-byte recovery id
-[2]       signature_instruction_index
-[3..5]    eth_address_offset      - byte position of 20-byte Ethereum address
-[5]       eth_address_instruction_index
-[6..8]    message_data_offset     - byte position of the raw message
-[8..10]   message_data_size
-[10]      message_instruction_index
-```
-
-### Constraints
-
-- **All instruction-index fields must be `0`.** An SBF program receives only
-  its own instruction data; cross-instruction references require a future
-  runtime change.
-- **Recovery id must be `0`–`3`.** Values `2`/`3` are accepted for
-  compatibility with legacy Solana secp256k1 instruction data and are passed
-  through to recovery, where overflowing signatures generally fail as
-  `InvalidArgument`. Ethereum-style `27`/`28` offsets are rejected at the wire
-  level.
-- **Zero-signature payloads** (`count == 0`) are accepted only when the buffer
-  is exactly 1 byte. Any trailing bytes are treated as malformed.
-- **No accounts.** The program takes no account arguments and returns
-  `InvalidArgument` if any are supplied.
-- **No CPI.** The program returns `InvalidArgument` when stack height is greater
-  than the transaction-level height (`1`).
-
-### Hashing
-
-The program Keccak-256 hashes `message` before recovering the public key. Pass
-the exact bytes that should be hashed for your signing scheme. For
-`personal_sign`, include the `"\x19Ethereum Signed Message:\n{len}"` prefix;
-for EIP-712 typed data, pass `"\x19\x01" || domain_separator || struct_hash`
-(66 bytes total). The program hashes those bytes for you. Passing the
-32-byte final digest would verify `keccak256(digest)`, causing valid typed-data
-signatures to fail.
-
-## Cargo features
-
-| Feature | Default | Description |
-|---|---|---|
-| `bincode` | off | Enables SDK-compatible instruction construction helpers. |
-| `dev-context-only-utils` | off | Backward-compatible alias for `bincode`, matching the upstream helper crate feature. |
-| `no-entrypoint` | off | Omits the program entrypoint; use when embedding the crate in another program or in tests that call `process_instruction` directly. |
-| `custom-heap` | off | Reserved for callers that provide a custom heap allocator. |
-| `serde` | off | Derives serde traits for `SecpSignatureOffsets`. |
-
-## Public API
-
-The SDK helpers and layout constants are exposed from `solana_secp256k1_program`:
+**Usage:**
 
 ```rust
-use solana_secp256k1_program::{
-    eth_address_from_pubkey, eth_address_from_sec1_pubkey,
-    new_secp256k1_instruction_with_signature, try_new_secp256k1_instruction_with_signature,
-    SecpSignatureOffsets,
-};
+use solana_secp256k1_verify::{Secp256k1Verifier, address::EvmAddress};
+
+// 1. Initialize the stateless verifier with standard EVM defaults
+let verifier = Secp256k1Verifier::default();
+
+// 2. Wrap your expected 20-byte Ethereum address
+let expected_address = EvmAddress([0xab; 20]);
+
+// 3. Execute the verification pipeline
+verifier.verify_signature(
+expected_address,
+&signature, // &[u8; 64]
+recovery_id, // u8 (0, 1, 2, or 3)
+&message // &[u8] dynamic message payload
+)?;
 ```
 
-`new_secp256k1_instruction_with_signature` keeps the upstream SDK return type
-(`Instruction`) for source compatibility. Prefer
-`try_new_secp256k1_instruction_with_signature` when callers need construction
-errors instead of panics for invalid offsets, oversized messages, or invalid
-recovery ids.
+_Note: To support legacy systems that produce high-s signatures, the verifier can be configured to automatically mutate high-s signatures into valid low-s signatures using `.auto_normalize_s()`. You can also completely disable malleability checks using `.allow_high_s()`._
 
-## Build and test
+### 2. Cross-Program Invocation (CPI)
 
-Stable Rust `1.93.1` is pinned in `rust-toolchain.toml`. Some make targets
-also require the nightly Rust chain `nightly-2026-01-22` (`clippy`,
-`format-check`, `rustdoc`, `feature-powerset`).
+If you prefer to offload the verification to a separate program, you can invoke `solana-secp256k1-program` via a Cross-Program Invocation (CPI).
 
-```sh
-# Unit tests (host, no SBF toolchain required)
-cargo test --manifest-path program/Cargo.toml
+**Instruction Data Layout:**
+The program expects a minimum of 85 bytes of instruction data, formatted as follows:
 
-# SBF build only
-cargo build-sbf --no-rustup-override --arch v3 --manifest-path program/Cargo.toml
+- `[0..20]`: The 20-byte Ethereum address.
+- `[20..84]`: The 64-byte signature.
+- `[84]`: The 1-byte recovery ID.
+- `[85..]`: The dynamic message payload.
 
-# SBF build via Makefile
-make build-sbf-program
+You can easily construct this instruction using the provided SDK helper:
 
-# Host unit tests, then SBF integration tests via Mollusk
-make test-program
+```rust
+use solana_secp256k1_program::verify;
+use solana_pubkey::Pubkey;
 
-# Print Mollusk compute-unit measurements for the SBF program
-make cu-program
+let instruction = verify(
+program_id,
+evm_address, // [u8; 20]
+signature, // [u8; 64]
+recovery_id, // u8
+message, // &[u8]
+);
 
-# Lint / format
-make clippy-program
-make format-check-program
+## // Submit via invoke()
 ```
 
-The Mollusk tests in `program/tests/mollusk.rs` execute the built
-`target/deploy/solana_secp256k1_program.so` artifact and report
-`compute_units_consumed` for one-signature and two-signature verification
-paths. Plain `cargo test --manifest-path program/Cargo.toml` still runs the
-host tests without requiring the SBF Rust chain; the Mollusk tests skip
-themselves unless `SBF_OUT_DIR` is set.
+### 3. Instruction Introspection
+
+Historically, many legacy applications relied on placing the precompile invocation alongside their program's invocation in the transaction, and using the `Instructions` sysvar to inspect the sibling instruction.
+
+You can replicate this legacy pattern by pushing the `solana-secp256k1-program` instruction to the transaction instead of the old precompile. Your on-chain program will need to:
+
+1. Load the `Instructions` sysvar.
+2. Find the sibling instruction and verify that its `program_id` matches the new `solana-secp256k1-program`.
+3. Parse its instruction data according to the layout described in the CPI section (`[0..20]` for address, `[20..84]` for signature, etc.).
