@@ -74,7 +74,11 @@ pub(crate) fn normalize_malleable_signature<'a>(
     let s = &signature[SCALAR_BYTES..];
     if s > SECP256K1_HALF_ORDER.as_slice() && s < SECP256K1_ORDER.as_slice() {
         *normalized_signature = *signature;
-        subtract_s_from_order(&mut normalized_signature[SCALAR_BYTES..]);
+        subtract_s_from_order(
+            (&mut normalized_signature[SCALAR_BYTES..64])
+                .try_into()
+                .unwrap(),
+        );
         (normalized_signature, recovery_id ^ 1)
     } else {
         (signature, recovery_id)
@@ -83,13 +87,8 @@ pub(crate) fn normalize_malleable_signature<'a>(
 
 /// Performs a big-endian, byte-by-byte subtraction of the scalar 's' from the
 /// secp256k1 curve order.
-///
-/// # Preconditions
-/// The caller MUST guarantee that the `s` slice is exactly 32 bytes long.
-/// Because this function relies on unsafe pointer math to avoid bounds checking,
-/// passing a slice smaller than 32 bytes will result in out-of-bounds memory access.
 #[inline(always)]
-pub(crate) fn subtract_s_from_order(s: &mut [u8]) {
+pub(crate) fn subtract_s_from_order(s: &mut [u8; 32]) {
     /// The secp256k1 curve order (N) broken into four 64-bit big-endian limbs.
     const SECP256K1_ORDER_LIMB_0: u64 = 0xffffffffffffffff;
     const SECP256K1_ORDER_LIMB_1: u64 = 0xfffffffffffffffe;
@@ -99,10 +98,9 @@ pub(crate) fn subtract_s_from_order(s: &mut [u8]) {
     // We use an `unsafe` block to bypass bounds checking and eliminate hidden
     // branching instructions.
     //
-    // SAFETY: The caller guarantees `s` is exactly 32 bytes long (a 256-bit scalar).
+    // SAFETY: The compiler guarantees `s` is exactly 32 bytes long.
     // Advancing the pointer by a maximum of 24 bytes and reading/writing an 8-byte
-    // array ([u8; 8]) is strictly within the allocated bounds (24 + 8 = 32).
-    // `read_unaligned`/`write_unaligned` safely handle arbitrary memory alignment.
+    // array is strictly within the allocated bounds.
     unsafe {
         // Read 256-bit number into four 64-bit chunks ("limbs").
         let ptr = s.as_ptr();
