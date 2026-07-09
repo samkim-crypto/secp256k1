@@ -3,7 +3,7 @@ use {
     mollusk_svm::{result::Check, Mollusk},
     sha3::{Digest, Keccak256},
     solana_pubkey::Pubkey,
-    solana_secp256k1_program::verify,
+    solana_secp256k1_verify::secp256k1_verify_instruction,
     std::{env, path::PathBuf},
 };
 
@@ -57,7 +57,7 @@ fn test_secp256k1_verify_success() {
     let mut evm_address = [0u8; 20];
     evm_address.copy_from_slice(&pubkey_hash[12..32]);
 
-    let instruction = verify(
+    let instruction = secp256k1_verify_instruction(
         program_id,
         evm_address,
         signature.to_bytes().into(),
