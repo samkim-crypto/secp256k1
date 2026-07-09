@@ -58,9 +58,9 @@ fn test_secp256k1_verify_success() {
     evm_address.copy_from_slice(&pubkey_hash[12..32]);
 
     let instruction = secp256k1_verify_instruction(
-        program_id,
-        evm_address,
-        signature.to_bytes().into(),
+        &program_id,
+        &evm_address,
+        &signature.to_bytes().into(),
         recovery_id.to_byte(),
         msg,
     );
