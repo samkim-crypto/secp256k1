@@ -78,7 +78,7 @@ pub(crate) fn normalize_malleable_signature<'a>(
             // `normalized_signature` is exactly 64 bytes, and `SCALAR_BYTES`
             // is 32. The slice `[32..64]` is strictly 32 bytes long, so
             // `unwrap` is safe.
-            (&mut normalized_signature[SCALAR_BYTES..64])
+            (&mut normalized_signature[SCALAR_BYTES..SIGNATURE_SERIALIZED_SIZE])
                 .try_into()
                 .unwrap(),
         );
@@ -91,7 +91,7 @@ pub(crate) fn normalize_malleable_signature<'a>(
 /// Performs a big-endian, byte-by-byte subtraction of the scalar 's' from the
 /// secp256k1 curve order.
 #[inline(always)]
-pub(crate) fn subtract_s_from_order(s: &mut [u8; 32]) {
+pub(crate) fn subtract_s_from_order(s: &mut [u8; SCALAR_BYTES]) {
     /// The secp256k1 curve order (N) broken into four 64-bit big-endian limbs.
     const SECP256K1_ORDER_LIMB_0: u64 = 0xffffffffffffffff;
     const SECP256K1_ORDER_LIMB_1: u64 = 0xfffffffffffffffe;

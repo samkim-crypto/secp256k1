@@ -21,12 +21,17 @@ impl AddressMatcher for EvmAddress {
     fn matches(&self, pubkey: &[u8; UNCOMPRESSED_PUBKEY_COORDS_BYTES]) -> bool {
         use crate::hash::{Keccak256Hasher, MessageHasher};
         if let Ok(pubkey_hash) = Keccak256Hasher::hash(pubkey) {
+            // The hash is 32 bytes. The EVM address is the last 20 bytes.
+            // 32 - 20 = 12 (the offset).
+            let offset = 32 - ETH_ADDRESS_BYTES;
+
             // Directly compare the target 20 bytes without allocating a new [0u8; 20]
             //
             // SAFETY: `pubkey_hash` is statically sized to exactly 32 bytes ([u8; 32]).
             // Advancing the pointer by 12 bytes and casting to a 20-byte array ([u8; 20])
             // is strictly within bounds (12 + 20 = 32).
-            let hash_addr = unsafe { &*(pubkey_hash.as_ptr().add(12) as *const [u8; 20]) };
+            let hash_addr =
+                unsafe { &*(pubkey_hash.as_ptr().add(offset) as *const [u8; ETH_ADDRESS_BYTES]) };
             self.0 == *hash_addr
         } else {
             false
