@@ -14,10 +14,7 @@ no_allocator!();
 nostd_panic_handler!();
 lazy_program_entrypoint!(process_instruction);
 
-pub fn process_instruction(mut context: InstructionContext) -> ProgramResult {
-    while context.remaining() > 0 {
-        let _ = context.next_account()?;
-    }
+pub fn process_instruction(context: InstructionContext) -> ProgramResult {
     let instruction_data = context.instruction_data()?;
 
     // Validate the minimum instruction data length.
