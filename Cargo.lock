@@ -2728,7 +2728,7 @@ dependencies = [
  "mollusk-svm",
  "pinocchio",
  "sha3 0.12.0",
- "solana-pubkey 4.1.0",
+ "solana-address 2.6.1",
  "solana-secp256k1-verify",
 ]
 
@@ -2748,10 +2748,10 @@ name = "solana-secp256k1-verify"
 version = "0.1.0"
 dependencies = [
  "hex",
+ "solana-address 2.6.1",
  "solana-define-syscall 5.1.0",
  "solana-instruction",
  "solana-keccak-hasher",
- "solana-pubkey 4.1.0",
  "solana-secp256k1-recover",
  "solana-sha256-hasher",
 ]
