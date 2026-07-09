@@ -75,6 +75,9 @@ pub(crate) fn normalize_malleable_signature<'a>(
     if s > SECP256K1_HALF_ORDER.as_slice() && s < SECP256K1_ORDER.as_slice() {
         *normalized_signature = *signature;
         subtract_s_from_order(
+            // `normalized_signature` is exactly 64 bytes, and `SCALAR_BYTES`
+            // is 32. The slice `[32..64]` is strictly 32 bytes long, so
+            // `unwrap` is safe.
             (&mut normalized_signature[SCALAR_BYTES..64])
                 .try_into()
                 .unwrap(),
