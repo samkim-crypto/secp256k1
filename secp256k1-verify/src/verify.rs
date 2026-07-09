@@ -83,6 +83,11 @@ pub(crate) fn normalize_malleable_signature<'a>(
 
 /// Performs a big-endian, byte-by-byte subtraction of the scalar 's' from the
 /// secp256k1 curve order.
+///
+/// # Preconditions
+/// The caller MUST guarantee that the `s` slice is exactly 32 bytes long.
+/// Because this function relies on unsafe pointer math to avoid bounds checking,
+/// passing a slice smaller than 32 bytes will result in out-of-bounds memory access.
 #[inline(always)]
 pub(crate) fn subtract_s_from_order(s: &mut [u8]) {
     /// The secp256k1 curve order (N) broken into four 64-bit big-endian limbs.
@@ -93,6 +98,11 @@ pub(crate) fn subtract_s_from_order(s: &mut [u8]) {
 
     // We use an `unsafe` block to bypass bounds checking and eliminate hidden
     // branching instructions.
+    //
+    // SAFETY: The caller guarantees `s` is exactly 32 bytes long (a 256-bit scalar).
+    // Advancing the pointer by a maximum of 24 bytes and reading/writing an 8-byte
+    // array ([u8; 8]) is strictly within the allocated bounds (24 + 8 = 32).
+    // `read_unaligned`/`write_unaligned` safely handle arbitrary memory alignment.
     unsafe {
         // Read 256-bit number into four 64-bit chunks ("limbs").
         let ptr = s.as_ptr();
@@ -101,7 +111,7 @@ pub(crate) fn subtract_s_from_order(s: &mut [u8]) {
         let s1 = u64::from_be_bytes(core::ptr::read_unaligned(ptr.add(8) as *const [u8; 8]));
         let s0 = u64::from_be_bytes(core::ptr::read_unaligned(ptr.add(0) as *const [u8; 8]));
 
-        // Compute  `N - s` (`N` - curve order, `s` the scalar)
+        // Compute  `N - s` (`N` - curve order, `s` - the scalar)
         // Subtract `s3` from the curve order's 4th (least significant) limb
         let (r3, b3) = SECP256K1_ORDER_LIMB_3.overflowing_sub(s3);
 

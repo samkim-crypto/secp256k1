@@ -41,6 +41,11 @@ impl MessageHasher for RawHasher {
             return Err(Secp256k1VerifyError::InvalidMessageLength);
         }
         // Grab bytes immediately bypassing zero allocation
+        //
+        // SAFETY: The explicit length check above guarantees that the `message`
+        // slice is exactly 32 bytes long. Therefore, casting its underlying pointer
+        // to a 32-byte array pointer and dereferencing it is memory-safe and
+        // guaranteed to be within bounds.
         Ok(unsafe { *(message.as_ptr() as *const [u8; 32]) })
     }
 }
