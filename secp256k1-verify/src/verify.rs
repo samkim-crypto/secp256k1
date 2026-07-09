@@ -35,10 +35,6 @@ pub(crate) fn recover_pubkey<H: MessageHasher>(
 
     let message_hash = H::hash(message)?;
 
-    #[cfg(target_os = "solana")]
-    let recovered = crate::syscall::secp256k1_recover(&message_hash, active_rec_id, active_sig)?;
-
-    #[cfg(not(target_os = "solana"))]
     let recovered =
         solana_secp256k1_recover::secp256k1_recover(&message_hash, active_rec_id, active_sig)
             .map_err(|_| Secp256k1VerifyError::RecoveryFailed)?

@@ -14,14 +14,7 @@ pub struct Keccak256Hasher;
 impl MessageHasher for Keccak256Hasher {
     #[inline(always)]
     fn hash(message: &[u8]) -> Result<[u8; 32], Secp256k1VerifyError> {
-        #[cfg(target_os = "solana")]
-        {
-            crate::syscall::keccak256(message)
-        }
-        #[cfg(not(target_os = "solana"))]
-        {
-            Ok(solana_keccak_hasher::hash(message).to_bytes())
-        }
+        Ok(solana_keccak_hasher::hash(message).to_bytes())
     }
 }
 
