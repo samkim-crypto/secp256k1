@@ -19,23 +19,15 @@ pub struct EvmAddress(pub [u8; ETH_ADDRESS_BYTES]);
 impl AddressMatcher for EvmAddress {
     #[inline(always)]
     fn matches(&self, pubkey: &[u8; UNCOMPRESSED_PUBKEY_COORDS_BYTES]) -> bool {
-        eth_address_from_pubkey(pubkey) == self.0
+        use crate::hash::{Keccak256Hasher, MessageHasher};
+        if let Ok(pubkey_hash) = Keccak256Hasher::hash(pubkey) {
+            // Directly compare the target 20 bytes without allocating a new [0u8; 20]
+            let hash_addr = unsafe { &*(pubkey_hash.as_ptr().add(12) as *const [u8; 20]) };
+            self.0 == *hash_addr
+        } else {
+            false
+        }
     }
-}
-
-/// Derives a standard 20-byte Ethereum address from an uncompressed 64-byte public key.
-#[cfg(feature = "keccak")]
-pub fn eth_address_from_pubkey(
-    pubkey: &[u8; UNCOMPRESSED_PUBKEY_COORDS_BYTES],
-) -> [u8; ETH_ADDRESS_BYTES] {
-    use crate::hash::{Keccak256Hasher, MessageHasher};
-
-    let pubkey_hash = Keccak256Hasher::hash(pubkey).unwrap_or([0u8; 32]);
-    let address_offset = 32 - ETH_ADDRESS_BYTES;
-    // let address_offset = solana_keccak_hasher::HASH_BYTES - ETH_ADDRESS_BYTES;
-    let mut addr = [0u8; ETH_ADDRESS_BYTES];
-    addr.copy_from_slice(&pubkey_hash[address_offset..]);
-    addr
 }
 
 pub struct RawPubkey<'a>(pub &'a [u8; UNCOMPRESSED_PUBKEY_COORDS_BYTES]);

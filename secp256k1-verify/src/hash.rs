@@ -26,14 +26,7 @@ pub struct Sha256Hasher;
 impl MessageHasher for Sha256Hasher {
     #[inline(always)]
     fn hash(message: &[u8]) -> Result<[u8; 32], Secp256k1VerifyError> {
-        #[cfg(target_os = "solana")]
-        {
-            crate::syscall::sha256(message)
-        }
-        #[cfg(not(target_os = "solana"))]
-        {
-            Ok(solana_sha256_hasher::hash(message).to_bytes())
-        }
+        Ok(solana_sha256_hasher::hash(message).to_bytes())
     }
 }
 
@@ -47,10 +40,8 @@ impl MessageHasher for RawHasher {
         if message.len() != 32 {
             return Err(Secp256k1VerifyError::InvalidMessageLength);
         }
-
-        let mut raw = [0u8; 32];
-        raw.copy_from_slice(message);
-        Ok(raw)
+        // Grab bytes immediately bypassing zero allocation
+        Ok(unsafe { *(message.as_ptr() as *const [u8; 32]) })
     }
 }
 
