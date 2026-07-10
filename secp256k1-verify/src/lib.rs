@@ -16,8 +16,6 @@ pub mod constants;
 mod error;
 #[cfg(feature = "verify")]
 mod hash;
-#[cfg(all(feature = "verify", any(target_os = "solana", target_arch = "bpf")))]
-mod syscall;
 #[cfg(feature = "verify")]
 mod verifier;
 #[cfg(feature = "verify")]
