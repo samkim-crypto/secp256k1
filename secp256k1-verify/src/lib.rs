@@ -6,7 +6,7 @@
 //! library tailored for Solana smart contracts (`eBPF`).
 
 #[cfg(feature = "instruction")]
-pub mod program;
+pub mod instruction;
 
 #[cfg(feature = "verify")]
 mod address;
@@ -24,7 +24,7 @@ mod verifier;
 mod verify;
 
 #[cfg(feature = "instruction")]
-pub use program::secp256k1_verify_instruction;
+pub use instruction::verify;
 
 #[cfg(feature = "verify")]
 pub use {
