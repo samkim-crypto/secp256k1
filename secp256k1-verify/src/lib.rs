@@ -11,9 +11,6 @@ pub mod error;
 pub mod hash;
 mod verify;
 
-#[cfg(any(target_os = "solana", target_arch = "bpf"))]
-mod syscall;
-
 #[cfg(feature = "keccak")]
 use crate::{address::EvmAddress, hash::Keccak256Hasher};
 

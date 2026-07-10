@@ -1,9 +1,9 @@
-use crate::error::Secp256k1VerifyError;
+use crate::{constants::SCALAR_BYTES, error::Secp256k1VerifyError};
 
 /// Defines the hashing algorithm applied to the message before signature recovery.
 pub trait MessageHasher {
     /// Hashes a dynamic message down to a 32-byte scalar.
-    fn hash(message: &[u8]) -> Result<[u8; 32], Secp256k1VerifyError>;
+    fn hash(message: &[u8]) -> Result<[u8; SCALAR_BYTES], Secp256k1VerifyError>;
 }
 
 /// Applies the `Keccak256` algorithm to the message (Standard Ethereum behavior).
@@ -13,15 +13,8 @@ pub struct Keccak256Hasher;
 #[cfg(feature = "keccak")]
 impl MessageHasher for Keccak256Hasher {
     #[inline(always)]
-    fn hash(message: &[u8]) -> Result<[u8; 32], Secp256k1VerifyError> {
-        #[cfg(target_os = "solana")]
-        {
-            crate::syscall::keccak256(message)
-        }
-        #[cfg(not(target_os = "solana"))]
-        {
-            Ok(solana_keccak_hasher::hash(message).to_bytes())
-        }
+    fn hash(message: &[u8]) -> Result<[u8; SCALAR_BYTES], Secp256k1VerifyError> {
+        Ok(solana_keccak_hasher::hash(message).to_bytes())
     }
 }
 
@@ -32,15 +25,8 @@ pub struct Sha256Hasher;
 #[cfg(feature = "sha256")]
 impl MessageHasher for Sha256Hasher {
     #[inline(always)]
-    fn hash(message: &[u8]) -> Result<[u8; 32], Secp256k1VerifyError> {
-        #[cfg(target_os = "solana")]
-        {
-            crate::syscall::sha256(message)
-        }
-        #[cfg(not(target_os = "solana"))]
-        {
-            Ok(solana_sha256_hasher::hash(message).to_bytes())
-        }
+    fn hash(message: &[u8]) -> Result<[u8; SCALAR_BYTES], Secp256k1VerifyError> {
+        Ok(solana_sha256_hasher::hash(message).to_bytes())
     }
 }
 
@@ -50,14 +36,17 @@ pub struct RawHasher;
 
 impl MessageHasher for RawHasher {
     #[inline(always)]
-    fn hash(message: &[u8]) -> Result<[u8; 32], Secp256k1VerifyError> {
-        if message.len() != 32 {
+    fn hash(message: &[u8]) -> Result<[u8; SCALAR_BYTES], Secp256k1VerifyError> {
+        if message.len() != SCALAR_BYTES {
             return Err(Secp256k1VerifyError::InvalidMessageLength);
         }
-
-        let mut raw = [0u8; 32];
-        raw.copy_from_slice(message);
-        Ok(raw)
+        // Grab bytes immediately bypassing zero allocation
+        //
+        // SAFETY: The explicit length check above guarantees that the `message`
+        // slice is exactly 32 bytes long. Therefore, casting its underlying pointer
+        // to a 32-byte array pointer and dereferencing it is memory-safe and
+        // guaranteed to be within bounds.
+        Ok(unsafe { *(message.as_ptr() as *const [u8; SCALAR_BYTES]) })
     }
 }
 

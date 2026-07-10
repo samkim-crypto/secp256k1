@@ -35,10 +35,6 @@ pub(crate) fn recover_pubkey<H: MessageHasher>(
 
     let message_hash = H::hash(message)?;
 
-    #[cfg(target_os = "solana")]
-    let recovered = crate::syscall::secp256k1_recover(&message_hash, active_rec_id, active_sig)?;
-
-    #[cfg(not(target_os = "solana"))]
     let recovered =
         solana_secp256k1_recover::secp256k1_recover(&message_hash, active_rec_id, active_sig)
             .map_err(|_| Secp256k1VerifyError::RecoveryFailed)?
@@ -78,7 +74,14 @@ pub(crate) fn normalize_malleable_signature<'a>(
     let s = &signature[SCALAR_BYTES..];
     if s > SECP256K1_HALF_ORDER.as_slice() && s < SECP256K1_ORDER.as_slice() {
         *normalized_signature = *signature;
-        subtract_s_from_order(&mut normalized_signature[SCALAR_BYTES..]);
+        subtract_s_from_order(
+            // `normalized_signature` is exactly 64 bytes, and `SCALAR_BYTES`
+            // is 32. The slice `[32..64]` is strictly 32 bytes long, so
+            // `unwrap` is safe.
+            (&mut normalized_signature[SCALAR_BYTES..SIGNATURE_SERIALIZED_SIZE])
+                .try_into()
+                .unwrap(),
+        );
         (normalized_signature, recovery_id ^ 1)
     } else {
         (signature, recovery_id)
@@ -87,18 +90,53 @@ pub(crate) fn normalize_malleable_signature<'a>(
 
 /// Performs a big-endian, byte-by-byte subtraction of the scalar 's' from the
 /// secp256k1 curve order.
-pub(crate) fn subtract_s_from_order(s: &mut [u8]) {
-    let mut borrow = 0u16;
-    for (byte, order_byte) in s.iter_mut().rev().zip(SECP256K1_ORDER.iter().rev()) {
-        let subtrahend = u16::from(*byte) + borrow;
-        let minuend = u16::from(*order_byte);
-        if minuend >= subtrahend {
-            *byte = (minuend - subtrahend) as u8;
-            borrow = 0;
-        } else {
-            *byte = (minuend + 256 - subtrahend) as u8;
-            borrow = 1;
-        }
+#[inline(always)]
+pub(crate) fn subtract_s_from_order(s: &mut [u8; SCALAR_BYTES]) {
+    /// The secp256k1 curve order (N) broken into four 64-bit big-endian limbs.
+    const SECP256K1_ORDER_LIMB_0: u64 = 0xffffffffffffffff;
+    const SECP256K1_ORDER_LIMB_1: u64 = 0xfffffffffffffffe;
+    const SECP256K1_ORDER_LIMB_2: u64 = 0xbaaedce6af48a03b;
+    const SECP256K1_ORDER_LIMB_3: u64 = 0xbfd25e8cd0364141;
+
+    // We use an `unsafe` block to bypass bounds checking and eliminate hidden
+    // branching instructions.
+    //
+    // SAFETY: The compiler guarantees `s` is exactly 32 bytes long.
+    // Advancing the pointer by a maximum of 24 bytes and reading/writing an 8-byte
+    // array is strictly within the allocated bounds.
+    unsafe {
+        // Read 256-bit number into four 64-bit chunks ("limbs").
+        let ptr = s.as_ptr();
+        let s3 = u64::from_be_bytes(core::ptr::read_unaligned(ptr.add(24) as *const [u8; 8]));
+        let s2 = u64::from_be_bytes(core::ptr::read_unaligned(ptr.add(16) as *const [u8; 8]));
+        let s1 = u64::from_be_bytes(core::ptr::read_unaligned(ptr.add(8) as *const [u8; 8]));
+        let s0 = u64::from_be_bytes(core::ptr::read_unaligned(ptr.add(0) as *const [u8; 8]));
+
+        // Compute  `N - s` (`N` - curve order, `s` - the scalar)
+        // Subtract `s3` from the curve order's 4th (least significant) limb
+        let (r3, b3) = SECP256K1_ORDER_LIMB_3.overflowing_sub(s3);
+
+        // Subtract `s2` and the previous borrow (`b3`) from the 3rd limb
+        let (r2_tmp, b2) = SECP256K1_ORDER_LIMB_2.overflowing_sub(s2);
+        let (r2, b2_2) = r2_tmp.overflowing_sub(b3 as u64); // carry propagation
+
+        // Subtract `s1` and the previous borrows from the 2nd limb
+        // Bitwise OR (`|`) combines the borrow flags without branching
+        let (r1_tmp, b1) = SECP256K1_ORDER_LIMB_1.overflowing_sub(s1);
+        // We use bitwise OR (`|`) to combine the borrow flags from Column 3.
+        // If *either* step in Column 3 needed a borrow, we pass a 1 over to this column.
+        let (r1, b1_2) = r1_tmp.overflowing_sub((b2 | b2_2) as u64);
+
+        // Subtract `s0` and the previous borrows from the 1st (most significant) limb
+        let (r0_tmp, _) = SECP256K1_ORDER_LIMB_0.overflowing_sub(s0);
+        let (r0, _) = r0_tmp.overflowing_sub((b1 | b1_2) as u64);
+
+        // Write the mutated limbs back into the original 32-byte slice
+        let mut_ptr = s.as_mut_ptr();
+        core::ptr::write_unaligned(mut_ptr.add(24) as *mut [u8; 8], r3.to_be_bytes());
+        core::ptr::write_unaligned(mut_ptr.add(16) as *mut [u8; 8], r2.to_be_bytes());
+        core::ptr::write_unaligned(mut_ptr.add(8) as *mut [u8; 8], r1.to_be_bytes());
+        core::ptr::write_unaligned(mut_ptr.add(0) as *mut [u8; 8], r0.to_be_bytes());
     }
 }
 
