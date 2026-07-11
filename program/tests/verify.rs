@@ -2,8 +2,8 @@ use {
     k256::ecdsa::SigningKey,
     mollusk_svm::{result::Check, Mollusk},
     sha3::{Digest, Keccak256},
-    solana_pubkey::Pubkey,
-    solana_secp256k1_program::verify,
+    solana_address::Address,
+    solana_secp256k1_verify::verify,
     std::{env, path::PathBuf},
 };
 
@@ -27,9 +27,9 @@ fn setup_sbf_env() -> Option<String> {
     Some(PROGRAM_SO_STEM.to_string())
 }
 
-fn make_mollusk() -> Option<(Mollusk, Pubkey)> {
+fn make_mollusk() -> Option<(Mollusk, Address)> {
     let program_name = setup_sbf_env()?;
-    let program_id = Pubkey::new_unique();
+    let program_id = Address::new_unique();
 
     let mollusk = Mollusk::new(&program_id, &program_name);
 
@@ -58,9 +58,9 @@ fn test_secp256k1_verify_success() {
     evm_address.copy_from_slice(&pubkey_hash[12..32]);
 
     let instruction = verify(
-        program_id,
-        evm_address,
-        signature.to_bytes().into(),
+        &program_id,
+        &evm_address,
+        &signature.to_bytes().into(),
         recovery_id.to_byte(),
         msg,
     );

@@ -8,21 +8,21 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = []
-no-entrypoint = []
 
 [dependencies]
 pinocchio = { workspace = true }
-solana-secp256k1-verify = { workspace = true }
-
-[target.'cfg(not(any(target_os = "solana", target_arch = "bpf")))'.dependencies]
-solana-instruction = { workspace = true }
-solana-pubkey = { workspace = true }
+solana-secp256k1-verify = { workspace = true, features = ["verify", "keccak"] }
 
 [dev-dependencies]
 mollusk-svm = { workspace = true }
 k256 = { workspace = true }
 sha3 = { workspace = true }
-solana-pubkey = { workspace = true }
+solana-address = { workspace = true }
+solana-secp256k1-verify = { workspace = true, features = [
+    "verify",
+    "keccak",
+    "instruction",
+] }
 
 [lints]
 workspace = true
