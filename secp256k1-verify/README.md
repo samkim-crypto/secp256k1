@@ -14,7 +14,7 @@ Ethereum (EIP-2) standards.
 By default, the `Secp256k1Verifier` applies Keccak-256 hashing, derives the 20-byte Ethereum address, and enforces low-s signatures to prevent malleability. High-s signatures will return an `InvalidMalleableSignature` error.
 
 ```rust
-use solana_secp256k1_verify::{Secp256k1Verifier, address::EvmAddress};
+use solana_secp256k1_verify::{Secp256k1Verifier, EvmAddress};
 
 // 1. Initialize the stateless verifier with standard EVM defaults
 let verifier = Secp256k1Verifier::default();
@@ -67,8 +67,8 @@ strict 32-byte pre-hashed inputs validated against a raw 64-byte public key.
 ```rust
 use solana_secp256k1_verify::{
     Secp256k1Verifier,
-    hash::RawHasher,
-    address::RawPubkey
+    RawHasher,
+    RawPubkey
 };
 
 // Configure the verifier for strict 32-byte pre-hashed inputs and full pubkeys

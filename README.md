@@ -20,7 +20,7 @@ The library utilizes a builder pattern to configure the verifier prior to execut
 **Usage:**
 
 ```rust
-use solana_secp256k1_verify::{Secp256k1Verifier, address::EvmAddress};
+use solana_secp256k1_verify::{Secp256k1Verifier, EvmAddress};
 
 // 1. Initialize the stateless verifier with standard EVM defaults
 let verifier = Secp256k1Verifier::default();
