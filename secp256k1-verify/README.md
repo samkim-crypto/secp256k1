@@ -84,3 +84,85 @@ custom_verifier.verify_signature(
     pre_hashed_message
 )?;
 ```
+
+## Compute Units (CU) Overhead
+
+This library operates with zero allocations (`#![no_std]`) and avoids hidden
+branching to minimize overhead.
+
+The majority of the compute unit cost comes from the underlying native
+`sol_secp256k1_recover` syscall, which consumes a flat baseline of
+**25,000 CUs**.
+
+Depending on your builder configuration (hashing algorithms and malleability
+checks), you can expect the following approximate costs per verification:
+
+- **Strict EVM Verification** (Keccak-256 + Enforce Low-S): `~25,316 CUs`
+- **Auto-Normalize S** (High-S Mutation): `~25,332 CUs`
+- **Raw Pre-hashed** (No hashing overhead): `~25,308 CUs`
+
+_(Note: CU consumption will slightly increase based on the size of the dynamic
+message payload)._
+
+## Extensibility via Traits
+
+To maximize flexibility and remain `#![no_std]` compliant with zero
+allocations, the verification pipeline relies on two core traits:
+`MessageHasher` and `AddressMatcher`. This allows you to easily inject custom
+cryptographic algorithms or identity derivations into the verification pipeline
+without incurring performance overhead.
+
+### 1. MessageHasher
+
+This trait dictates how a dynamic message payload is hashed down to a 32-byte
+scalar before public key recovery.
+
+The library provides three built-in implementations:
+
+- `Keccak256Hasher`: Applies the standard Keccak-256 algorithm (Default EVM
+  behavior).
+- `Sha256Hasher`: Applies the standard SHA-256 algorithm.
+- `RawHasher`: A strict pass-through for messages that are already pre-hashed
+  to exactly 32 bytes. This bypasses internal hashing overhead entirely.
+
+**Implementing a Custom Hasher:**
+
+```rust
+use solana_secp256k1_verify::{MessageHasher, Secp256k1VerifyError};
+
+pub struct MyCustomHasher;
+
+impl MessageHasher for MyCustomHasher {
+    fn hash(message: &[u8]) -> Result<[u8; 32], Secp256k1VerifyError> {
+        // Custom hashing logic to return a 32-byte scalar
+        // ...
+    }
+}
+```
+
+### 2. AddressMatcher
+
+This trait defines how the recovered 64-byte uncompressed public key is matched
+against your expected target identity or address format.
+
+The library provides two built-in implementations:
+
+- `EvmAddress`: Hashes the public key via Keccak-256 and strictly matches the
+  20-byte suffix (Standard Ethereum EVM address derivation).
+- `RawPubkey`: Performs a direct 64-byte comparison against a fully uncompressed
+  public key.
+
+**Implementing a Custom Address Matcher:**
+
+```rust
+use solana_secp256k1_verify::AddressMatcher;
+
+pub struct CustomIdentityMatcher(pub [u8; 32]);
+
+impl AddressMatcher for CustomIdentityMatcher {
+    fn matches(&self, recovered_pubkey: &[u8; 64]) -> bool {
+        // Custom address derivation and matching logic
+        // ...
+    }
+}
+```

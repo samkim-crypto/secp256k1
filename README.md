@@ -55,7 +55,7 @@ You can easily construct this instruction using the provided SDK helper:
 
 ```rust
 use solana_secp256k1_program::verify;
-use solana_pubkey::Pubkey;
+use solana_address::Address;
 
 let instruction = verify(
 program_id,
@@ -77,3 +77,17 @@ You can replicate this legacy pattern by pushing the `solana-secp256k1-program` 
 1. Load the `Instructions` sysvar.
 2. Find the sibling instruction and verify that its `program_id` matches the new `solana-secp256k1-program`.
 3. Parse its instruction data according to the layout described in the CPI section (`[0..20]` for address, `[20..84]` for signature, etc.).
+
+## Performance & Compute Units (CU)
+
+This repository is optimized for ultra-low compute unit consumption by leveraging stateless, zero-allocation architectures (`#![no_std]`) and direct native syscall pipelines.
+
+A standard verification costs a flat baseline of **~25,000 CUs** driven by the underlying `sol_secp256k1_recover` syscall. Below is a quick performance profile:
+
+| Strategy                 | Target Format                | Approximate CU Cost |
+| :----------------------- | :--------------------------- | :------------------ |
+| **Strict EVM (Default)** | 20-byte Ethereum Address     | `~25,316 CUs`       |
+| **Auto-Normalize S**     | Malleable Signature Recovery | `~25,372 CUs`       |
+| **Allow High-S**         | Unchecked Signature Recovery | `~25,348 CUs`       |
+
+For automated benchmarking workflows or details on how config flags affect optimization, see the [solana-secp256k1-verify documentation](./solana-secp256k1-verify/README.md).
