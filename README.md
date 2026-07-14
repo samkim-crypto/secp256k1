@@ -82,14 +82,11 @@ You can replicate this legacy pattern by pushing the `solana-secp256k1-program` 
 
 ## Performance & Compute Units (CU)
 
-This repository is optimized for ultra-low compute unit consumption by leveraging stateless, zero-allocation architectures (`#![no_std]`) and direct native syscall pipelines.
+This repository is optimized for ultra-low compute unit consumption by leveraging a stateless, zero-allocation architecture (`#![no_std]`) and direct native syscall pipelines.
 
-A standard verification costs a flat baseline of **~25,000 CUs** driven by the underlying `sol_secp256k1_recover` syscall. Below is a quick performance profile:
+Because the underlying `sol_secp256k1_recover` syscall consumes a flat physical baseline of **25,000 CUs**, this library aims to add as close to zero overhead as possible.
 
-| Strategy                 | Target Format                | Approximate CU Cost |
-| :----------------------- | :--------------------------- | :------------------ |
-| **Strict EVM (Default)** | 20-byte Ethereum Address     | `~25,316 CUs`       |
-| **Auto-Normalize S**     | Malleable Signature Recovery | `~25,372 CUs`       |
-| **Allow High-S**         | Unchecked Signature Recovery | `~25,348 CUs`       |
+- **Strict EVM (Default)** -- ~25,316 CUs: Full Ethereum compliance (Keccak-256, 20-byte address match, Low-S enforced).
+- **Bare-Minimum Preset** -- ~25,046 CUs: Pre-hashed payload, raw 64-byte pubkey match, and malleability checks bypassed.
 
-For automated benchmarking workflows or details on how config flags affect optimization, see the [solana-secp256k1-verify documentation](./solana-secp256k1-verify/README.md).
+For a precise breakdown of how each builder configuration flag affects the compute unit budget (such as allowing high-S signatures or mutating malleability), please see the detailed breakdown in the [solana-secp256k1-verify documentation](./secp256k1-verify/README.md).

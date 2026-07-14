@@ -94,14 +94,38 @@ The majority of the compute unit cost comes from the underlying native
 `sol_secp256k1_recover` syscall, which consumes a flat baseline of
 **25,000 CUs**.
 
-Depending on your builder configuration (hashing algorithms and malleability
-checks), you can expect the following approximate costs per verification:
+For the standard use case of strict EVM verification (Keccak-256 hashing,
+Ethereum address matching, and enforcing Low-S) the total cost is
+approximately **25,316 CUs**.
 
-- **Strict EVM Verification** (Keccak-256 + Enforce Low-S): `~25,316 CUs`
-- **Auto-Normalize S** (High-S Mutation): `~25,332 CUs`
-- **Raw Pre-hashed** (No hashing overhead): `~25,308 CUs`
+### Configuration Modifiers
 
-_(Note: CU consumption will slightly increase based on the size of the dynamic
+Depending on your builder configuration, you can calculate your exact overhead
+by applying the following modifiers to the **25,316** CU baseline:
+
+**Signature Malleability**
+
+- **Strict (Enforce Low-S):** `Baseline`
+- **Auto-Normalize S:** `+19 CUs` _(Mutates high-S signatures to low-S)_
+- **Allow High-S:** `-5 CUs` _(Skips bounds checking entirely)_
+
+**Message Hashing**
+
+- **Keccak256Hasher:** `Baseline`
+- **RawHasher (Pre-Hashed):** `-161 CUs` _(Bypasses the payload hash syscall)_
+
+**Address Matching**
+
+- **EvmAddress:** `Baseline`
+- **RawPubkey (64-byte Match):** `-165 CUs` _(Bypasses the public key hash syscall)_
+
+Because of overlapping compiler register optimizations and the hard physical floor
+of the 25,000 CU recovery syscall, modifiers are not perfectly linear when combined.
+Combining both `RawHasher` and `RawPubkey` yields a total combined savings of **-270
+CUs** (rather than -326 CUs), resulting in the **25,046 CU** bare-minimum preset.
+
+_(If utilizing a dynamic hasher like `Keccak256Hasher` or `Sha256Hasher`,
+CU consumption will scale linearly at a rate of 1 CU per byte of the
 message payload)._
 
 ## Extensibility via Traits
