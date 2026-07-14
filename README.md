@@ -56,6 +56,7 @@ You can easily construct this instruction using the provided SDK helper:
 ```rust
 use solana_secp256k1_program::verify;
 use solana_address::Address;
+use solana_program::program::invoke;
 
 let instruction = verify(
 program_id,
@@ -65,7 +66,8 @@ recovery_id, // u8
 message, // &[u8]
 );
 
-## // Submit via invoke()
+// Submit via CPI
+invoke(&instruction, &[])?;
 ```
 
 ### 3. Instruction Introspection
