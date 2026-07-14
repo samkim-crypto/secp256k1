@@ -55,7 +55,7 @@ You can easily construct this instruction using the provided SDK helper:
 
 ```rust
 use solana_secp256k1_program::{verify, ID as SECP256K1_PROGRAM_ID};
-use solana_program::program::invoke;
+use solana_cpi::invoke;
 
 let instruction = verify(
 &SECP256K1_PROGRAM_ID,
