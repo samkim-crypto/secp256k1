@@ -54,12 +54,11 @@ The program expects a minimum of 85 bytes of instruction data, formatted as foll
 You can easily construct this instruction using the provided SDK helper:
 
 ```rust
-use solana_secp256k1_program::verify;
-use solana_address::Address;
+use solana_secp256k1_program::{verify, ID as SECP256K1_PROGRAM_ID};
 use solana_program::program::invoke;
 
 let instruction = verify(
-program_id,
+&SECP256K1_PROGRAM_ID,
 evm_address, // [u8; 20]
 signature, // [u8; 64]
 recovery_id, // u8

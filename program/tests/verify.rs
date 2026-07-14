@@ -29,7 +29,7 @@ fn setup_sbf_env() -> Option<String> {
 
 fn make_mollusk() -> Option<(Mollusk, Address)> {
     let program_name = setup_sbf_env()?;
-    let program_id = Address::new_unique();
+    let program_id = solana_secp256k1_verify::id();
 
     let mollusk = Mollusk::new(&program_id, &program_name);
 

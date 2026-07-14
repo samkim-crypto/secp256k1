@@ -1,6 +1,13 @@
 extern crate alloc;
 
-use {alloc::vec, alloc::vec::Vec, solana_address::Address, solana_instruction::Instruction};
+use {
+    alloc::vec,
+    alloc::vec::Vec,
+    solana_address::{declare_id, Address},
+    solana_instruction::Instruction,
+};
+
+declare_id!("SecKmPp2K9A9C7S8urKS7wjDvE3BL8B22XZHEuXVTRY");
 
 /// Constructs an on-chain instruction to invoke `solana-secp256k1-program`.
 pub fn verify(

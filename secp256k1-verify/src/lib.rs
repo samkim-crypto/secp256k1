@@ -22,7 +22,7 @@ mod verifier;
 mod verify;
 
 #[cfg(feature = "instruction")]
-pub use instruction::verify;
+pub use instruction::{id, verify, ID};
 
 #[cfg(feature = "verify")]
 pub use {
